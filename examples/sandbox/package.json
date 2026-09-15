@@ -25,6 +25,7 @@
     "start:sandbox-agents-as-tools": "node sandbox-agents-as-tools.ts",
     "start:blaxel": "tsx extensions/blaxel-runner.ts",
     "start:cloudflare": "tsx extensions/cloudflare-runner.ts",
+    "start:createos": "tsx extensions/createos-runner.ts",
     "start:daytona": "tsx extensions/daytona-runner.ts",
     "start:e2b": "tsx extensions/e2b-runner.ts",
     "start:modal": "tsx extensions/modal-runner.ts",
