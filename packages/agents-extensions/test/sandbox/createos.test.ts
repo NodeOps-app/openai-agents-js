@@ -182,6 +182,42 @@ describe('CreateOSSandboxClient', () => {
     );
   });
 
+  test('does not follow redirects from CreateOS with provider credentials', async () => {
+    await new CreateOSSandboxClient({
+      shape: 's-1vcpu-1gb',
+      rootfs: 'devbox:1',
+    }).create(new Manifest());
+    const options = mocks.clientOptions.mock.lastCall?.[0] as {
+      fetch: typeof fetch;
+    };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: 'https://other.example.test/' },
+      }),
+    );
+    try {
+      const { CreateosSandboxClient: SdkClient } = await vi.importActual<
+        typeof import('@nodeops-createos/sandbox')
+      >('@nodeops-createos/sandbox');
+      const sdkClient = new SdkClient({
+        apiKey: 'test-key',
+        baseUrl: 'https://createos.example.test',
+        fetch: options.fetch,
+      });
+      await expect(
+        sdkClient.createSandbox({ shape: 's-1vcpu-1gb', rootfs: 'devbox:1' }),
+      ).rejects.toThrow();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://createos.example.test/v1/sandboxes',
+        expect.objectContaining({ redirect: 'manual' }),
+      );
+      expect(fetchSpy).toHaveBeenCalledOnce();
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
   test('rejects unsafe environment names before provider effects', async () => {
     const client = new CreateOSSandboxClient({
       rootfs: 'devbox:1',
@@ -215,6 +251,7 @@ describe('CreateOSSandboxClient', () => {
     expect(mocks.clientOptions).toHaveBeenCalledWith({
       apiKey: 'secret-api-key',
       baseUrl: 'https://createos.example.test',
+      fetch: expect.any(Function),
       timeoutMs: undefined,
     });
     expect(mocks.createSandbox).toHaveBeenCalledWith(
@@ -1052,6 +1089,7 @@ describe('CreateOSSandboxClient', () => {
     expect(mocks.clientOptions).toHaveBeenLastCalledWith({
       apiKey: 'new-api-key',
       baseUrl: undefined,
+      fetch: expect.any(Function),
       timeoutMs: undefined,
     });
   });

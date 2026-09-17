@@ -156,6 +156,7 @@ type CreateOSSdkClient = {
 type CreateOSSdkClientClass = new (options?: {
   apiKey?: string;
   baseUrl?: string;
+  fetch?: typeof fetch;
   timeoutMs?: number;
 }) => CreateOSSdkClient;
 
@@ -1134,6 +1135,9 @@ async function createSdkClient(
   return new Client({
     apiKey: options.apiKey,
     baseUrl: options.baseUrl,
+    // Avoid the SDK's shared transport without forwarding credentials on redirects.
+    fetch: (input, init) =>
+      globalThis.fetch(input, { ...init, redirect: 'manual' }),
     timeoutMs: options.requestTimeoutMs,
   });
 }
