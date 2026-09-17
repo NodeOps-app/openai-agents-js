@@ -159,8 +159,32 @@ describe('CreateOSSandboxClient', () => {
     expect(mocks.createSandbox).not.toHaveBeenCalled();
   });
 
+  test('requires a rootfs before calling CreateOS', async () => {
+    const client = new CreateOSSandboxClient({ shape: 's-1vcpu-1gb' });
+
+    await expect(client.create(new Manifest())).rejects.toThrow(
+      'requires a non-empty `rootfs` option',
+    );
+    await expect(
+      client.create(new Manifest(), { rootfs: '  ' }),
+    ).rejects.toThrow('requires a non-empty `rootfs` option');
+    expect(mocks.createSandbox).not.toHaveBeenCalled();
+  });
+
+  test('accepts a rootfs supplied for an individual create call', async () => {
+    const client = new CreateOSSandboxClient({ shape: 's-1vcpu-1gb' });
+
+    await client.create(new Manifest(), { rootfs: 'devbox:1' });
+
+    expect(mocks.createSandbox).toHaveBeenCalledWith(
+      expect.objectContaining({ rootfs: 'devbox:1' }),
+      { timeoutMs: undefined },
+    );
+  });
+
   test('rejects unsafe environment names before provider effects', async () => {
     const client = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       env: { '--split-string': 'printf injected' },
     });
@@ -225,7 +249,10 @@ describe('CreateOSSandboxClient', () => {
   });
 
   test('rejects unsupported snapshots and mounts', async () => {
-    const client = new CreateOSSandboxClient({ shape: 's-1vcpu-1gb' });
+    const client = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
+      shape: 's-1vcpu-1gb',
+    });
     await expect(
       client.create({ manifest: new Manifest(), snapshot: { type: 'remote' } }),
     ).rejects.toBeInstanceOf(SandboxUnsupportedFeatureError);
@@ -245,7 +272,10 @@ describe('CreateOSSandboxClient', () => {
   });
 
   test('reports PTY support only for a complete managed-process API', async () => {
-    const client = new CreateOSSandboxClient({ shape: 's-1vcpu-1gb' });
+    const client = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
+      shape: 's-1vcpu-1gb',
+    });
     const session = await client.create(new Manifest());
     expect(session.supportsPty()).toBe(true);
 
@@ -279,6 +309,7 @@ describe('CreateOSSandboxClient', () => {
       return { input_seq: 1 };
     });
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       env: { APP_ENV: 'test' },
       requestTimeoutMs: 123,
@@ -328,6 +359,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('rejects PTY runAs before creating a managed process', async () => {
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
     }).create(new Manifest());
 
@@ -340,6 +372,7 @@ describe('CreateOSSandboxClient', () => {
   test('terminates a managed PTY when the initial input fails', async () => {
     mocks.processInput.mockRejectedValueOnce(new Error('input failed'));
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       requestTimeoutMs: 123,
     }).create(new Manifest());
@@ -373,6 +406,7 @@ describe('CreateOSSandboxClient', () => {
       await new Promise(() => {});
     });
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       pauseOnExit: true,
     }).create(new Manifest());
@@ -424,6 +458,7 @@ describe('CreateOSSandboxClient', () => {
       await new Promise(() => {});
     });
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
     }).create(new Manifest());
 
@@ -448,6 +483,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('rejects a stale PTY request after shutdown and restart', async () => {
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
     }).create(new Manifest());
 
@@ -477,6 +513,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('serializes resumable state without provider credentials', async () => {
     const client = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       pauseOnExit: true,
       apiKey: 'secret-api-key',
@@ -502,7 +539,10 @@ describe('CreateOSSandboxClient', () => {
   });
 
   test('drops unknown serialized fields instead of persisting credentials', async () => {
-    const client = new CreateOSSandboxClient({ shape: 's-1vcpu-1gb' });
+    const client = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
+      shape: 's-1vcpu-1gb',
+    });
     const session = await client.create(new Manifest());
     const serialized = {
       ...(await client.serializeSessionState(session.state)),
@@ -523,7 +563,10 @@ describe('CreateOSSandboxClient', () => {
   });
 
   test('rejects unsafe serialized manifest environment names', async () => {
-    const client = new CreateOSSandboxClient({ shape: 's-1vcpu-1gb' });
+    const client = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
+      shape: 's-1vcpu-1gb',
+    });
     const session = await client.create(new Manifest());
     const serialized = await client.serializeSessionState(session.state);
     const manifest = serialized.manifest as Record<string, unknown>;
@@ -556,7 +599,10 @@ describe('CreateOSSandboxClient', () => {
     ['environment', 7],
     ['environment', null],
   ])('rejects malformed serialized field %s', async (field, value) => {
-    const client = new CreateOSSandboxClient({ shape: 's-1vcpu-1gb' });
+    const client = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
+      shape: 's-1vcpu-1gb',
+    });
     const session = await client.create(new Manifest());
     const serialized = await client.serializeSessionState(session.state);
 
@@ -576,7 +622,10 @@ describe('CreateOSSandboxClient', () => {
   ])(
     'rejects malformed direct resume field %s before provider effects',
     async (field, value) => {
-      const client = new CreateOSSandboxClient({ shape: 's-1vcpu-1gb' });
+      const client = new CreateOSSandboxClient({
+        rootfs: 'devbox:1',
+        shape: 's-1vcpu-1gb',
+      });
       const session = await client.create(new Manifest());
       mocks.clientOptions.mockClear();
       mocks.getSandbox.mockClear();
@@ -612,6 +661,7 @@ describe('CreateOSSandboxClient', () => {
       },
     );
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
     }).create(new Manifest());
 
@@ -627,6 +677,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('uses constructor archive limits for newly created sessions', async () => {
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       archiveLimits: { maxInputBytes: 1 },
     }).create(new Manifest());
@@ -660,6 +711,7 @@ describe('CreateOSSandboxClient', () => {
       },
     );
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
     }).create(new Manifest({ root: '/tmp' }));
 
@@ -677,6 +729,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('reconnects and resumes a paused serialized sandbox', async () => {
     const client = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       requestTimeoutMs: 123,
     });
@@ -719,6 +772,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('applies rehydrated environment values to resumed commands', async () => {
     const originalClient = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       env: { API_TOKEN: 'old-token' },
     });
@@ -733,6 +787,7 @@ describe('CreateOSSandboxClient', () => {
       original.state,
     );
     const currentClient = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       env: { API_TOKEN: 'new-token' },
     });
@@ -760,7 +815,10 @@ describe('CreateOSSandboxClient', () => {
   });
 
   test('rejects invalid resume environment before provider effects', async () => {
-    const client = new CreateOSSandboxClient({ shape: 's-1vcpu-1gb' });
+    const client = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
+      shape: 's-1vcpu-1gb',
+    });
     const session = await client.create(new Manifest());
     mocks.getSandbox.mockClear();
     mocks.resume.mockClear();
@@ -790,7 +848,10 @@ describe('CreateOSSandboxClient', () => {
   });
 
   test('snapshots direct resume state before provider awaits', async () => {
-    const client = new CreateOSSandboxClient({ shape: 's-1vcpu-1gb' });
+    const client = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
+      shape: 's-1vcpu-1gb',
+    });
     const session = await client.create(
       new Manifest({ environment: { ORIGINAL: 'value' } }),
     );
@@ -825,6 +886,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('revalidates environment names before every command', async () => {
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
     }).create(new Manifest());
     session.state.environment['--split-string'] = 'printf injected';
@@ -838,6 +900,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('accepts zero timeout values during create and resume', async () => {
     const client = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       requestTimeoutMs: 0,
       commandTimeoutMs: 0,
@@ -870,7 +933,10 @@ describe('CreateOSSandboxClient', () => {
   });
 
   test('does not recreate a terminal sandbox during resume', async () => {
-    const client = new CreateOSSandboxClient({ shape: 's-1vcpu-1gb' });
+    const client = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
+      shape: 's-1vcpu-1gb',
+    });
     const original = await client.create(new Manifest());
     const state = await client.deserializeSessionState(
       await client.serializeSessionState(original.state),
@@ -886,6 +952,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('destroys a non-preserved sandbox exactly once', async () => {
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
     }).create(new Manifest());
 
@@ -897,6 +964,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('allows explicit deletion after a pause-on-exit close', async () => {
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       pauseOnExit: true,
     }).create(new Manifest());
@@ -910,6 +978,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('destroys a pause-on-exit sandbox during non-preserving cleanup', async () => {
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       pauseOnExit: true,
     }).create(new Manifest());
@@ -924,6 +993,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('restarts a reusable preserved paused session handle', async () => {
     const client = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       pauseOnExit: true,
     });
@@ -950,6 +1020,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('reconnects instead of reusing stale live authority', async () => {
     const client = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       pauseOnExit: true,
       apiKey: 'old-api-key',
@@ -987,6 +1058,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('keeps live credentials private and rejects sandbox identity mutation', async () => {
     const client = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       pauseOnExit: true,
       apiKey: 'private-api-key',
@@ -1025,6 +1097,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('rejects live reuse when trusted manifest entries change', async () => {
     const client = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       pauseOnExit: true,
     });
@@ -1044,6 +1117,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('starts a sandbox paused outside the local session lifecycle', async () => {
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       pauseOnExit: true,
     }).create(new Manifest());
@@ -1058,6 +1132,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('retries a preserved-session running wait without replaying resume', async () => {
     const client = new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       pauseOnExit: true,
     });
@@ -1078,6 +1153,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('pauses after a preserved-session running wait fails', async () => {
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       pauseOnExit: true,
     }).create(new Manifest());
@@ -1102,6 +1178,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('lets destroy dominate concurrently queued start and pause', async () => {
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       pauseOnExit: true,
     }).create(new Manifest());
@@ -1124,6 +1201,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('lets destroy dominate a concurrently queued pause', async () => {
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       pauseOnExit: true,
     }).create(new Manifest());
@@ -1145,6 +1223,7 @@ describe('CreateOSSandboxClient', () => {
       return sandbox;
     });
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       pauseOnExit: true,
     }).create(new Manifest());
@@ -1162,6 +1241,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('retries rejected pause, destroy, and destroy-wait attempts', async () => {
     const pausedSession = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       pauseOnExit: true,
     }).create(new Manifest());
@@ -1172,6 +1252,7 @@ describe('CreateOSSandboxClient', () => {
 
     sandboxStatus = 'running';
     const pauseWaitSession = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       pauseOnExit: true,
     }).create(new Manifest());
@@ -1182,6 +1263,7 @@ describe('CreateOSSandboxClient', () => {
     expect(mocks.pause).toHaveBeenCalledTimes(pauseCallsBeforeWaitFailure + 1);
 
     const destroyedSession = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
     }).create(new Manifest());
     mocks.destroy.mockRejectedValueOnce(new Error('destroy failed'));
@@ -1189,6 +1271,7 @@ describe('CreateOSSandboxClient', () => {
     await expect(destroyedSession.close()).resolves.toBeUndefined();
 
     const waitedSession = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
     }).create(new Manifest());
     const destroyCallsBeforeWaitFailure = mocks.destroy.mock.calls.length;
@@ -1203,6 +1286,7 @@ describe('CreateOSSandboxClient', () => {
 
   test('retries destroy when close follows a rejected delete', async () => {
     const session = await new CreateOSSandboxClient({
+      rootfs: 'devbox:1',
       shape: 's-1vcpu-1gb',
       pauseOnExit: true,
     }).create(new Manifest());

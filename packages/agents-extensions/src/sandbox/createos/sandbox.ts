@@ -184,6 +184,7 @@ const CREATEOS_DEFAULT_BASE_URL = 'https://api.sb.createos.sh';
 export interface CreateOSSandboxClientOptions extends SandboxClientOptions {
   /** CreateOS compute shape, for example `s-1vcpu-1gb`. */
   shape?: string;
+  /** Required when creating a sandbox; may be supplied here or per create call. */
   rootfs?: string;
   name?: string;
   networkIds?: string[];
@@ -790,6 +791,11 @@ export class CreateOSSandboxClient implements SandboxClient<
     assertCoreSnapshotUnsupported('CreateOSSandboxClient', createArgs.snapshot);
     const resolvedOptions = { ...this.options, ...createArgs.options };
     validateOptions(resolvedOptions);
+    if (!resolvedOptions.rootfs || resolvedOptions.rootfs.trim().length === 0) {
+      throw new UserError(
+        'CreateOSSandboxClient requires a non-empty `rootfs` option to create a sandbox.',
+      );
+    }
     const manifest = createArgs.manifest;
     assertSandboxManifestMetadataSupported('CreateOSSandboxClient', manifest);
 

@@ -51,6 +51,9 @@ async function main() {
   const question = getStringArg('--question', DEFAULT_QUESTION);
   const shape = getStringArg('--shape', DEFAULT_SHAPE);
   const rootfs = getOptionalStringArg('--rootfs');
+  if (!rootfs?.trim()) {
+    throw new Error('--rootfs is required (for example, --rootfs devbox:1).');
+  }
   const pauseOnExit = hasFlag('--pause-on-exit');
   const stream = hasFlag('--stream');
   const client = new CreateOSSandboxClient({ shape, rootfs, pauseOnExit });
