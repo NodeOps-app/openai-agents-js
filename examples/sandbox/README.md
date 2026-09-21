@@ -24,6 +24,14 @@ Most examples call a model through `run`, so set `OPENAI_API_KEY` in your shell 
 | `unix-local-runner.ts` | `pnpm -F sandbox start:unix-local-runner` | Runs directly against the Unix-local sandbox backend. |
 | `docker-runner.ts` | `pnpm -F sandbox start:docker-runner` | Runs directly against the Docker sandbox backend. |
 
+## Hosted Provider Examples
+
+| Provider | Run | Required environment |
+| --- | --- | --- |
+| CreateOS | `pnpm -F sandbox start:createos` | `OPENAI_API_KEY`, `CREATEOS_SANDBOX_API_KEY`, and `CREATEOS_SANDBOX_BASE_URL` |
+
+The CreateOS example accepts `--shape`, `--rootfs`, `--question`, `--model`, `--pause-on-exit`, and `--stream`. The provider uses portable tar workspace persistence and supports interactive PTY commands when `@nodeops-createos/sandbox` 0.8.2 or newer is installed. Native CreateOS fork checkpoints are not yet supported.
+
 ## Notes
 
 The JavaScript SDK now exposes generic remote snapshot and memory store interfaces. Cloud-specific convenience stores for S3, GCS, R2, or Azure are intentionally left to extension packages or application code so core does not pull in provider SDK dependencies.
